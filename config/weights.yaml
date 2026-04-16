@@ -1,0 +1,46 @@
+# beacon-score signal weights configuration
+# Each weight is a float between 0.0 and 1.0
+# All weights are applied independently — they do not need to sum to 1.0
+# Higher weight = signal contributes more to the final beacon probability score
+
+weights:
+
+  # T1071 - Application Layer Protocol
+  # Low coefficient of variation across connection intervals = automated beaconing
+  interval_regularity: 0.25
+
+  # T1571 - Non-Standard Port
+  # Mean absolute deviation relative to mean interval — low jitter = non-human origin
+  jitter_low: 0.15
+
+  # T1095 - Non-Application Layer Protocol
+  # Uniform orig/resp byte ratios across sessions = encoded keep-alive traffic
+  byte_ratio_uniform: 0.12
+
+  # T1071.001 - Web Protocols
+  # High session count relative to time window = automated poll/beacon loop
+  session_frequency: 0.10
+
+  # T1071.004 - DNS
+  # Long-lived persistent connections = C2 keep-alive or tunneled channel
+  long_connection: 0.08
+
+  # T1573.002 - Asymmetric Cryptography
+  # TLS SNI hostname does not match certificate CN/SAN = domain fronting or evasion
+  sni_cert_mismatch: 0.10
+
+  # T1568.002 - Domain Generation Algorithms
+  # High Shannon entropy on subdomain labels = DGA or DNS tunneling payload
+  dns_entropy_high: 0.08
+
+  # T1587.003 - Digital Certificates
+  # Short certificate validity period = attacker-issued or ephemeral infrastructure
+  short_cert_lifetime: 0.07
+
+  # T1587.003 - Digital Certificates
+  # Self-signed certificate = attacker-controlled TLS endpoint
+  self_signed_cert: 0.03
+
+  # T1568 - Dynamic Resolution
+  # Low TTL variance across DNS responses for this destination = fast-flux adjacent
+  low_ttl_variance: 0.02
