@@ -2,7 +2,7 @@
 
 **Multi-signal C2 beacon detection from Zeek logs or PCAP.**
 
-beacon-score correlates `conn.log`, `dns.log`, and `ssl.log` to produce a ranked list of C2 beacon candidates with per-signal breakdowns, ATT&CK technique mapping, and configurable signal weights. Drop in a PCAP and it handles Zeek invocation automatically.
+beacon-score correlates `conn.log`, `dns.log`, and `ssl.log` to produce a ranked list of C2 beacon candidates with per-signal breakdowns, ATT&CK technique mapping, and configurable signal weights. Drop in a PCAP and it handles Zeek invocation automatically (requires Zeek installed and in PATH).
 
 ```
 $ beacon-score --conn conn.log --dns dns.log --ssl ssl.log --detail
@@ -11,7 +11,7 @@ $ beacon-score --conn conn.log --dns dns.log --ssl ssl.log --detail
  ──────────────────────────────────────────────────────────────────
  1   185.220.101.45     0.7830   HIGH           180        T1071 T1587.003 T1071.001
  2   194.165.16.11      0.5446   MEDIUM         72         T1095 T1071 T1573.002
- 3   45.142.212.100     0.2930   LOW            60         T1071.001 T1568.002
+ 3   45.142.212.100     0.3118   LOW            60         T1071.001 T1568.002
 ```
 
 ---
@@ -31,15 +31,15 @@ Each signal is scored independently (0.0–1.0), weighted, and summed to produce
 | Signal | ATT&CK | Description |
 |---|---|---|
 | `interval_regularity` | T1071 | Low coefficient of variation across connection intervals — automated origin |
-| `jitter_low` | T1571 | Mean absolute deviation relative to interval mean — non-human timing |
-| `byte_ratio_uniform` | T1095 | Uniform orig/resp byte ratios across sessions — encoded keep-alive |
+| `jitter_low` | T1071 | Mean absolute deviation relative to interval mean — non-human timing |
+| `byte_ratio_uniform` | T1071 | Uniform orig/resp byte ratios across sessions — encoded keep-alive |
 | `session_frequency` | T1071.001 | High session rate relative to time window — automated poll loop |
-| `long_connection` | T1071.004 | Persistent long-lived connections — tunneled channel or keep-alive |
-| `sni_cert_mismatch` | T1573.002 | TLS SNI does not match certificate CN/SAN — domain fronting or evasion |
-| `dns_entropy_high` | T1568.002 | High Shannon entropy on subdomain labels — DGA or DNS tunneling |
+| `long_connection` | T1071 | Persistent long-lived connections — tunneled channel or keep-alive |
+| `sni_cert_mismatch` | T1573.002 | TLS SNI does not match the certificate subject CN — possible domain fronting or evasion. **SAN is not checked (Zeek writes SANs to `x509.log`, which is not read), and wildcard certificates are reported as mismatches.** |
+| `dns_entropy_high` | T1568.002 | High Shannon entropy on subdomain labels — DGA indicator for destinations already surfaced by conn-based signals. **Does not detect DNS tunnelling: ports 53/67/68/123/5353 are excluded before candidate generation, so a DNS-tunnelled channel never becomes a candidate.** |
 | `short_cert_lifetime` | T1587.003 | Short certificate validity window — attacker-issued ephemeral infrastructure |
 | `self_signed_cert` | T1587.003 | Issuer matches subject — attacker-controlled TLS endpoint |
-| `low_ttl_variance` | T1568 | Low DNS TTL variance for destination — fast-flux adjacent behavior |
+| `low_ttl_variance` | T1568 | Low DNS TTL magnitude and variance for destination — fast-flux adjacent behaviour |
 
 Confidence bands:
 
@@ -55,7 +55,7 @@ Confidence bands:
 
 ## Installation
 
-Requires Python 3.10+.
+Requires Python 3.10+ as declared in `pyproject.toml`. (It also runs on 3.9; the declared floor is conservative and untested.)
 
 ```bash
 git clone https://github.com/0xPersist/beacon-score
@@ -79,13 +79,23 @@ pip install ".[rich]"
 beacon-score --conn conn.log --dns dns.log --ssl ssl.log
 ```
 
-All three logs are optional individually. Scoring degrades gracefully when a log is absent — signals that require the missing source are skipped.
+Scoring runs with any subset of logs. **Signals whose source is missing score zero and still count toward the total, so an absent log lowers the score rather than being excluded from it.**
+
+Reachable weight by input:
+
+| Input | Max reachable score |
+|---|---|
+| `conn.log` only | 0.70 of 1.00 |
+| `+ dns.log` | 0.80 |
+| `+ ssl.log` | 1.00 |
+
+**A plaintext (non-TLS) beacon therefore cannot reach CRITICAL (0.80) no matter how regular it is.** Compare scores only between runs using the same set of logs.
 
 ```bash
 # conn.log only — interval, jitter, byte ratio, frequency, duration signals
 beacon-score --conn conn.log
 
-# conn + dns — adds entropy scoring
+# conn + dns — adds entropy scoring for destinations already surfaced by conn signals
 beacon-score --conn conn.log --dns dns.log
 ```
 
@@ -191,6 +201,8 @@ Run the test suite:
 pip install pytest
 pytest tests/ -v
 ```
+
+**Known issue:** the suite reports 42 passing tests but `tests/test_beacon_score.py` defines 98. Fourteen class names are declared twice, so Python discards the first definition of each and 56 tests never execute. A green run currently covers 43% of the tests written.
 
 ---
 
