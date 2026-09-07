@@ -659,9 +659,26 @@ class TestRenderer:
 
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# SECOND SUITE.
+#
+# These classes previously reused the names of the classes above, so Python
+# discarded the first definition of each and 56 tests never ran. They are now
+# suffixed Round2 so both suites execute (42 -> 98 collected).
+#
+# Note that most of this block duplicates the first suite: of the 40 tests here,
+# 36 are byte-identical to a test above. Only four are unique:
+#   TestScoreCandidateRound2.test_all_signals_present
+#   TestConfigRound2.test_default_weights
+#   TestConfigRound2.test_yaml_config
+#   TestRendererRound2.test_json_output_structure
+# Folding those four into the first suite and deleting the rest would give the
+# same coverage in roughly 60 tests instead of 98.
+# ══════════════════════════════════════════════════════════════════════════════
+
 # ── Engine unit tests ─────────────────────────────────────────────────────────
 
-class TestEntropy:
+class TestEntropyRound2:
     def test_empty(self):
         assert _entropy("") == 0.0
 
@@ -676,7 +693,7 @@ class TestEntropy:
         assert abs(_entropy("ab") - 1.0) < 0.001
 
 
-class TestCoV:
+class TestCoVRound2:
     def test_zero_mean(self):
         assert _coefficient_of_variation([0, 0, 0]) == 0.0
 
@@ -691,7 +708,7 @@ class TestCoV:
         assert cov > 0.4
 
 
-class TestIntervalRegularity:
+class TestIntervalRegularityRound2:
     def test_insufficient(self):
         score, ev = _interval_regularity_score([60])
         assert score == 0.0
@@ -708,7 +725,7 @@ class TestIntervalRegularity:
         assert score < 0.3
 
 
-class TestJitter:
+class TestJitterRound2:
     def test_zero_jitter(self):
         score, ev = _jitter_score([60.0] * 20)
         assert score > 0.9
@@ -721,7 +738,7 @@ class TestJitter:
         assert score < 0.5
 
 
-class TestByteRatio:
+class TestByteRatioRound2:
     def test_uniform_ratio(self):
         orig = [128] * 20
         resp = [64] * 20
@@ -737,7 +754,7 @@ class TestByteRatio:
         assert score < 0.7
 
 
-class TestSessionFrequency:
+class TestSessionFrequencyRound2:
     def test_high_rate(self):
         score, ev = _session_frequency_score(720, 2.0)  # 360/hr
         assert score >= 1.0
@@ -751,7 +768,7 @@ class TestSessionFrequency:
         assert score == 0.0
 
 
-class TestConfidenceLabel:
+class TestConfidenceLabelRound2:
     def test_labels(self):
         assert _confidence_label(0.85) == "CRITICAL"
         assert _confidence_label(0.65) == "HIGH"
@@ -760,7 +777,7 @@ class TestConfidenceLabel:
         assert _confidence_label(0.05) == "INFORMATIONAL"
 
 
-class TestDnsEntropy:
+class TestDnsEntropyRound2:
     def test_high_entropy_subdomains(self):
         queries = [f"xk3j9mf2b1{'abcde'[:i+1]}.example.com" for i in range(20)]
         score, _ = _dns_entropy_score(queries)
@@ -774,7 +791,7 @@ class TestDnsEntropy:
 
 # ── Integration: score_candidate ─────────────────────────────────────────────
 
-class TestScoreCandidate:
+class TestScoreCandidateRound2:
     def _make_beacon_sessions(self, count=60, interval=60.0, jitter_pct=0.02):
         import random
         random.seed(10)
@@ -844,7 +861,7 @@ class TestScoreCandidate:
 
 # ── Parser tests ──────────────────────────────────────────────────────────────
 
-class TestParsers:
+class TestParsersRound2:
     def _write_json_log(self, path, records):
         with open(path, "w") as f:
             for r in records:
@@ -911,7 +928,7 @@ class TestParsers:
 
 # ── Private IP detection ──────────────────────────────────────────────────────
 
-class TestPrivateFilter:
+class TestPrivateFilterRound2:
     def test_private(self):
         assert _is_private("192.168.1.1")
         assert _is_private("10.0.0.1")
@@ -925,7 +942,7 @@ class TestPrivateFilter:
 
 # ── Correlator integration test ───────────────────────────────────────────────
 
-class TestCorrelator:
+class TestCorrelatorRound2:
     def test_end_to_end(self, tmp_path):
         import random
         random.seed(42)
@@ -971,7 +988,7 @@ class TestCorrelator:
 
 # ── Config tests ──────────────────────────────────────────────────────────────
 
-class TestConfig:
+class TestConfigRound2:
     def test_default_weights(self):
         weights = load_weights(None)
         assert "interval_regularity" in weights
@@ -1009,7 +1026,7 @@ class TestConfig:
 
 # ── Renderer test ─────────────────────────────────────────────────────────────
 
-class TestRenderer:
+class TestRendererRound2:
     def test_json_output_structure(self):
         import random
         random.seed(5)

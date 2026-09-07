@@ -8,13 +8,14 @@ version = "1.0.0"
 description = "Multi-signal C2 beacon detection from Zeek logs or PCAP"
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 keywords = ["security", "network", "C2", "beacon", "detection", "zeek", "threat-hunting"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Information Technology",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",

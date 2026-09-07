@@ -171,25 +171,69 @@ def _long_connection_score(durations: list[float]) -> tuple[float, str]:
     )
 
 
+def _cn_values(subject: str) -> list:
+    """Pull the CN value(s) out of a certificate subject DN.
+
+    The subject arrives as a full DN ("CN=example.com,O=Example Inc"), so a
+    substring test against the whole string is both too loose and too strict.
+    """
+    out = []
+    for part in subject.split(","):
+        part = part.strip()
+        if part.lower().startswith("cn="):
+            out.append(part[3:].strip().lower())
+    return out or [subject.strip().lower()]
+
+
+def _sni_matches_cn(sni: str, cn: str) -> bool:
+    """Wildcard-aware SNI/CN comparison.
+
+    Ported from c2-fingerprint's _san_mismatch_score, which already handled
+    this correctly. A wildcard certificate is the common case on the internet;
+    treating CN=*.example.com as a mismatch for foo.example.com made this
+    signal fire on ordinary TLS.
+    """
+    sni = sni.strip().lower()
+    cn = cn.strip().lower()
+    if not sni or not cn:
+        return False
+    if cn == sni:
+        return True
+    if cn.startswith("*."):
+        base = cn[2:]
+        parts = sni.split(".")
+        if len(parts) >= 2 and ".".join(parts[1:]) == base:
+            return True
+    if sni.endswith("." + cn) or cn.endswith("." + sni):
+        return True
+    return False
+
+
 def _sni_cert_mismatch_score(sni_set: set, cert_cn_set: set) -> tuple[float, str]:
     """
-    SNI hostname not matching cert CN/SAN = possible domain fronting or evasion.
+    SNI hostname not matching the certificate subject CN = possible domain
+    fronting or evasion. SANs are not available here: Zeek writes them to
+    x509.log, which this tool does not load.
     """
     if not sni_set or not cert_cn_set:
         return 0.0, "no TLS data available"
+    cns = []
+    for subject in cert_cn_set:
+        cns.extend(_cn_values(subject))
+    if not cns:
+        return 0.0, "no comparisons possible"
     mismatches = 0
     total = 0
     for sni in sni_set:
-        for cn in cert_cn_set:
-            total += 1
-            if sni.lower() not in cn.lower() and cn.lower() not in sni.lower():
-                mismatches += 1
+        total += 1
+        if not any(_sni_matches_cn(sni, cn) for cn in cns):
+            mismatches += 1
     if total == 0:
         return 0.0, "no comparisons possible"
     score = mismatches / total
     return (
         round(score, 3),
-        f"{mismatches}/{total} SNI/cert CN pairs mismatched"
+        f"{mismatches}/{total} SNI value(s) unmatched by cert CN ({', '.join(sorted(cns)[:3])})"
     )
 
 

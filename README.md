@@ -35,7 +35,7 @@ Each signal is scored independently (0.0–1.0), weighted, and summed to produce
 | `byte_ratio_uniform` | T1071 | Uniform orig/resp byte ratios across sessions — encoded keep-alive |
 | `session_frequency` | T1071.001 | High session rate relative to time window — automated poll loop |
 | `long_connection` | T1071 | Persistent long-lived connections — tunneled channel or keep-alive |
-| `sni_cert_mismatch` | T1573.002 | TLS SNI does not match the certificate subject CN — possible domain fronting or evasion. **SAN is not checked (Zeek writes SANs to `x509.log`, which is not read), and wildcard certificates are reported as mismatches.** |
+| `sni_cert_mismatch` | T1573.002 | TLS SNI does not match the certificate subject CN — possible domain fronting or evasion. Wildcard certificates are handled: `CN=*.example.com` matches `foo.example.com`. **SAN is still not checked** — Zeek writes SANs to `x509.log`, which this tool does not load — so a certificate that covers the SNI only via a SAN entry will still be reported as a mismatch. |
 | `dns_entropy_high` | T1568.002 | High Shannon entropy on subdomain labels — DGA indicator for destinations already surfaced by conn-based signals. **Does not detect DNS tunnelling: ports 53/67/68/123/5353 are excluded before candidate generation, so a DNS-tunnelled channel never becomes a candidate.** |
 | `short_cert_lifetime` | T1587.003 | Short certificate validity window — attacker-issued ephemeral infrastructure |
 | `self_signed_cert` | T1587.003 | Issuer matches subject — attacker-controlled TLS endpoint |
@@ -55,7 +55,7 @@ Confidence bands:
 
 ## Installation
 
-Requires Python 3.10+ as declared in `pyproject.toml`. (It also runs on 3.9; the declared floor is conservative and untested.)
+Requires Python 3.9+. The floor is 3.9 because the package uses PEP 585 builtin generics (`list[SignalResult]`) in dataclass field annotations, which are evaluated at class creation; it was previously declared as 3.10 without being tested, and runs correctly on 3.9.6.
 
 ```bash
 git clone https://github.com/0xPersist/beacon-score
@@ -246,6 +246,7 @@ Both Zeek log formats are supported and auto-detected:
 
 ## Limitations
 
+- **Internal-to-internal traffic is not scored by default.** Destinations in RFC1918, loopback and link-local space are dropped before candidate generation, so a beacon from one internal host to another — lateral C2 to an internal pivot or staging host — is invisible unless you pass `--include-private`. The filter is applied to the destination only and has no notion of which side of the conversation is monitored, so on an ingress capture it does not help.
 - Encrypted payloads: byte ratio signals are less reliable over QUIC or HTTP/3 where packet framing differs
 - Short capture windows: interval regularity requires at least 3 sessions per destination to score
 - IPv6: supported in log parsing, private range filtering covers `::1` and `fe80::`
