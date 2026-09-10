@@ -657,6 +657,24 @@ class TestRenderer:
         assert candidate.destination in captured.out
         assert candidate.confidence in captured.out
 
+    def test_ts_to_human_fixed_epoch(self):
+        """
+        Zeek timestamps are epoch seconds and render as UTC wall time. Pinned to
+        an exact string: the formatter carries no %z/%Z, so moving from the
+        deprecated naive utcfromtimestamp() to a tz-aware datetime must not
+        change a single character of output.
+        """
+        from beacon_score.renderer import _ts_to_human
+        assert _ts_to_human("1700000000") == "2023-11-14 22:13:20"
+        assert _ts_to_human("1700000000.0") == "2023-11-14 22:13:20"
+
+    def test_ts_to_human_rejects_junk(self):
+        from beacon_score.renderer import _ts_to_human
+        assert _ts_to_human("0") == "unknown"
+        assert _ts_to_human("-1") == "unknown"
+        assert _ts_to_human("") == "unknown"
+        assert _ts_to_human("not-a-timestamp") == "not-a-timestamp"
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════
